@@ -7,12 +7,12 @@ from collections import Counter
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
 # Initialize the OpenAI client
-client = openai.OpenAI(api_key=st.secrets.DB_KEY)
+client = openai.OpenAI(api_key="sk-xuddRMTS6b0S3JJF33Oq-bXhOyUd19D-vt_U8PZTEgT3BlbkFJf49ASi_5Tmt9BavZvQHyejeWmQAAJ7NtiAv-PehOwA")
 
 # Database and Domain Configuration
 DB_NAME = "postgres"
 DB_USER = "postgres"
-DB_PASS = st.secrets.DB_PASS  # Replace with your password
+DB_PASS = "Doodwth48*"  # Replace with your password
 DB_HOST = "db.emoqynypfvojgmzwofxi.supabase.co"
 DB_PORT = "5432"
 DOMAIN_NAME = "Pharmaceutical"
@@ -224,6 +224,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
