@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import openai
 import psycopg2
+from pgvector.psycopg2 import register_vector
 from collections import Counter
 
 # --- Configuration and Backend Functions ---
@@ -10,11 +11,6 @@ from collections import Counter
 client = openai.OpenAI(api_key=st.secrets["KEY"])
 
 # Database and Domain Configuration
-DB_NAME = "postgres"
-DB_USER = "postgres.emoqynypfvojgmzwofxi"
-DB_PASS = st.secrets["DB_PASS"]  # Replace with your password
-DB_HOST = "aws-1-eu-north-1.pooler.supabase.com"
-DB_PORT = "5432"
 DOMAIN_NAME = "Pharmaceutical"
 TABLE_DESCRIPTION = "This table contains information about companies and their service categories, including company details, service classifications, geographic location, and various analytical and manufacturing equipment."
 ALL_COLUMNS = [
@@ -136,7 +132,7 @@ def vector_search(embedding: list[float], conn) -> list:
             FROM public.column_embeddings
             ORDER BY embedding <=> %s
             LIMIT 20;
-        """, (str(embedding),))
+        """, (embedding,))
         return cursor.fetchall()
 
 # --- The User Interface ---
@@ -157,12 +153,8 @@ with col1:
     if st.button("Search"):
         if user_input:
             with st.spinner("Processing query... This may take a moment."):
-                conn = psycopg2.connect(
-                    dbname=DB_NAME,
-                    user=DB_USER,
-                    password=DB_PASS,  # Reads the password from Streamlit secrets
-                    host=DB_HOST,
-                    port=DB_PORT)
+                conn = psycopg2.connect(st.secrets["DB_URL"])
+                register_vector(conn)
                 
                 # 1. Generate descriptions from the user input
                 query_descriptions = reformulate_for_query(user_input)
@@ -227,6 +219,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
