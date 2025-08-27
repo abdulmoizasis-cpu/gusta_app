@@ -2,7 +2,7 @@ import streamlit as st
 import os
 import openai
 import psycopg2
-from pgvector.psycopg2 import register_vector
+from psycopg2.pgvector import register_vector
 from collections import Counter
 
 # --- Configuration and Backend Functions ---
@@ -219,6 +219,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
