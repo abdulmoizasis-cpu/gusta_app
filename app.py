@@ -8,7 +8,7 @@ from collections import Counter
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
 # Initialize the OpenAI client
-client = openai.OpenAI(api_key=st.secrets["KEY"])
+client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # Database and Domain Configuration
 DOMAIN_NAME = "Pharmaceutical"
@@ -219,6 +219,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
