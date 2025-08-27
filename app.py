@@ -2,24 +2,19 @@ import streamlit as st
 import os
 import openai
 import psycopg2
-from dotenv import load_dotenv
 from collections import Counter
 
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
-
-# Load environment variables from your .env file
-load_dotenv()
-
 # Initialize the OpenAI client
 client = openai.OpenAI(api_key=st.secrets["KEY"])
 
 # Database and Domain Configuration
-DB_NAME = "embeddings_test"
+DB_NAME = "postgres"
 DB_USER = "postgres"
 DB_PASS = st.secrets["DB_PASS"]  # Replace with your password
-DB_HOST = "127.0.0.1"
-DB_PORT = "5433"
+DB_HOST = "db.emoqynypfvojgmzwofxi.supabase.co"
+DB_PORT = "5432"
 DOMAIN_NAME = "Pharmaceutical"
 TABLE_DESCRIPTION = "This table contains information about companies and their service categories, including company details, service classifications, geographic location, and various analytical and manufacturing equipment."
 ALL_COLUMNS = [
@@ -229,3 +224,4 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
