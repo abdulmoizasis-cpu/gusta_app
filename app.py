@@ -12,12 +12,12 @@ from collections import Counter
 load_dotenv()
 
 # Initialize the OpenAI client
-client = openai.OpenAI(api_key=os.environ.get("KEY"))
+client = openai.OpenAI(api_key=st.secrets["KEY"])
 
 # Database and Domain Configuration
 DB_NAME = "embeddings_test"
 DB_USER = "postgres"
-DB_PASS = "ronaldo123."  # Replace with your password
+DB_PASS = st.secrets["DB_PASS"]  # Replace with your password
 DB_HOST = "127.0.0.1"
 DB_PORT = "5433"
 DOMAIN_NAME = "Pharmaceutical"
@@ -227,4 +227,5 @@ with col2:
     if st.button("Clear Results"):
         # A placeholder button that doesn't need to do anything in Streamlit,
         # as the app's state will naturally clear on the next search.
+
         st.info("Results will be cleared on the next search.")
