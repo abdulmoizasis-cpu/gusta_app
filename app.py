@@ -2,7 +2,6 @@ import streamlit as st
 import os
 import openai
 import psycopg2
-from psycopg2.pgvector import register_vector
 from collections import Counter
 
 # --- Configuration and Backend Functions ---
@@ -154,7 +153,6 @@ with col1:
         if user_input:
             with st.spinner("Processing query... This may take a moment."):
                 conn = psycopg2.connect(st.secrets["DB_URL"])
-                register_vector(conn)
                 
                 # 1. Generate descriptions from the user input
                 query_descriptions = reformulate_for_query(user_input)
@@ -219,6 +217,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
