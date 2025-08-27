@@ -158,7 +158,7 @@ with col1:
         if user_input:
             with st.spinner("Processing query... This may take a moment."):
                 conn = psycopg2.connect(
-                    DATABASE_URL=postgresql://postgres:[Doodwth48*]@db.emoqynypfvojgmzwofxi.supabase.co:5432/postgres
+                    DATABASE_URL="postgresql://postgres:[Doodwth48*]@db.emoqynypfvojgmzwofxi.supabase.co:5432/postgres"
                 )
                 
                 # 1. Generate descriptions from the user input
@@ -224,6 +224,7 @@ with col2:
         # as the app's state will naturally clear on the next search.
 
         st.info("Results will be cleared on the next search.")
+
 
 
 
