@@ -131,7 +131,7 @@ def vector_search(embedding: list[float], conn) -> list:
             FROM public.column_embeddings
             ORDER BY embedding <=> %s
             LIMIT 20;
-        """, (embedding,))
+        """, (str(embedding),))
         return cursor.fetchall()
 
 # --- The User Interface ---
@@ -215,7 +215,6 @@ with col2:
     if st.button("Clear Results"):
         # A placeholder button that doesn't need to do anything in Streamlit,
         # as the app's state will naturally clear on the next search.
-
         st.info("Results will be cleared on the next search.")
 
 
