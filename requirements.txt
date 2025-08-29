@@ -3,4 +3,5 @@ psycopg2-binary
 openai
 python-dotenv
 numpy
-pandas
+inflect
+nltk
