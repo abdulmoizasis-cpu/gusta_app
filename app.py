@@ -1,15 +1,23 @@
+
 import streamlit as st
 import os
 import openai
 import psycopg2
 from collections import Counter
+import re
+from dotenv import load_dotenv
+import inflect
+from urllib.parse import urlparse
+import nltk
+from nltk.corpus import wordnet
+from nltk.stem import WordNetLemmatizer
+from metadata_filter import *
 
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
 # Initialize the OpenAI client
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
-# Database and Domain Configuration
 DOMAIN_NAME = "Pharmaceutical"
 TABLE_DESCRIPTION = "This table contains information about companies and their service categories, including company details, service classifications, geographic location, and various analytical and manufacturing equipment."
 ALL_COLUMNS = [
@@ -123,17 +131,57 @@ def get_embedding(text: str) -> list[float]:
     response = client.embeddings.create(model="text-embedding-3-small", input=text)
     return response.data[0].embedding
 
-def vector_search(embedding: list[float], conn) -> list:
+def vector_search(embedding: list[float], prefiltered_columns: list[str], conn) -> list:
     """Performs a vector similarity search and returns the top 15 matches."""
-    with conn.cursor() as cursor:
-        cursor.execute("""
-            SELECT column_name, description
-            FROM public.column_embeddings
-            ORDER BY embedding <=> %s
-            LIMIT 20;
-        """, (str(embedding),))
-        return cursor.fetchall()
+    if not prefiltered_columns :
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name, description
+                FROM public.column_embeddings
+                ORDER BY embedding <=> %s
+                LIMIT 20;
+            """, (str(embedding),))
+            return cursor.fetchall()
+    else :
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT column_name, description
+                FROM public.column_embeddings
+                WHERE column_name = ANY(%s) -- This is the new filtering clause
+                ORDER BY embedding <=> %s
+                LIMIT 15;
+            """, (prefiltered_columns, str(embedding)))
+            return cursor.fetchall()
 
+            
+
+def get_keyword_match_counts(user_keywords: list[str], conn) -> dict:
+    """
+    Performs an exact-match keyword search and returns a dictionary mapping
+    column names to their keyword match count.
+    """
+    if not user_keywords:
+        return {}
+    with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT
+                    column_name,
+                    -- This part calculates the count of intersecting keywords
+                    (SELECT COUNT(*)
+                        FROM unnest(keywords) as k
+                        WHERE k = ANY(%s)) as match_count,
+                    keywords
+                FROM
+                    public.column_embeddings
+                WHERE
+                    keywords && %s
+                ORDER BY
+                    match_count DESC;
+            """, (user_keywords, user_keywords))
+            
+            results = cursor.fetchall()
+            return results
+    
 # --- The User Interface ---
 st.title("Database Vector Search")
 st.write("Enter a query to find the most relevant columns in the database.")
@@ -154,58 +202,75 @@ with col1:
             with st.spinner("Processing query... This may take a moment."):
                 conn = psycopg2.connect(st.secrets["DB_URL"])
                 
-                # 1. Generate descriptions from the user input
-                query_descriptions = reformulate_for_query(user_input)
-                
-                results_from_all_descriptions = []
-                if query_descriptions:
-                    # 2. Get embeddings and perform vector search for each description
-                    for desc in query_descriptions:
-                        embedding = get_embedding(desc)
-                        retrieved_columns = vector_search(embedding, conn)
-                        results_from_all_descriptions.append(retrieved_columns)
-                
+            user_keywords = extract_unique_words_advanced([user_input])
+            # 2. Get the pre-filtered columns and their keyword match data
+            keyword_matches_results = get_keyword_match_counts(user_keywords, conn)
 
-                # 3. Aggregate results using the interleaved ranking logic
-                if results_from_all_descriptions:
-                    interleaved_results = []
-                    # Find the length of the longest result list to set the loop range
-                    max_len = max(len(res) for res in results_from_all_descriptions)
+            # Create a dictionary for easy lookup of match counts and db_keywords
+            keyword_match_data = {
+                column_name: {"count": match_count, "db_keywords": db_keywords}
+                for column_name, match_count, db_keywords in keyword_matches_results
+            }
+            
+            prefiltered_columns = list(keyword_match_data.keys())
+
+            # 3. Generate technical descriptions for the vector search
+            query_descriptions = reformulate_for_query(user_input)
+            
+            results_from_all_descriptions = []
+            if query_descriptions:
+                for desc in query_descriptions:
+                    embedding = get_embedding(desc)
+                    retrieved_columns = vector_search(embedding, prefiltered_columns, conn)
+                    results_from_all_descriptions.append(retrieved_columns)
+
+            # 5. Aggregate and rank the vector search results using the interleaved method
+            if results_from_all_descriptions:
+                interleaved_results = []
+                max_len = max(len(res) for res in results_from_all_descriptions if res)
+                
+                for i in range(max_len):
+                    for result_list in results_from_all_descriptions:
+                        if i < len(result_list):
+                            if result_list[i] not in interleaved_results:
+                                interleaved_results.append(result_list[i])
+                            if len(interleaved_results) >= 15:
+                                break
+                    if len(interleaved_results) >= 15:
+                        break
+            
+                with results_container:
+                    st.success("Search complete! Here are the most relevant columns found:")
                     
-                    # Loop rank by rank (i=0 is rank 1, i=1 is rank 2, etc.)
-                    for i in range(max_len):
-                        # Loop through each description's result list
-                        for result_list in results_from_all_descriptions:
-                            # Check if the current rank 'i' exists in the list
-                            if i < len(result_list):
-                                # Add the result only if it's not already in our final list
-                                if result_list[i] not in interleaved_results:
-                                    interleaved_results.append(result_list[i])
-                                # Stop as soon as we have 15 unique results
-                                if len(interleaved_results) >= 15:
-                                    break
-                        if len(interleaved_results) >= 15:
-                            break
-                    
-                    # Display the newly ranked results
-                    with results_container:
-                        st.success("Search complete! Here are the top 15 most relevant columns found:")
+                    # 1. Create 5 columns for the headers with adjusted widths.
+                    h_rank, h_col, h_desc, h_count, h_kwords = st.columns([1, 4, 8, 2, 3])
+                    h_rank.write("**Rank**")
+                    h_col.write("**Column Name**")
+                    h_desc.write("**Description Snippet**")
+                    h_count.write("**Match Count**")
+                    h_kwords.write("**Keywords Matched**") # Use the correct variable for this header
+
+                    # 2. Loop through the ranked vector search results.
+                    for i, (col_name, col_desc) in enumerate(interleaved_results, 1):
+                        # 3. Look up the keyword data for the current column.
+                        match_info = keyword_match_data.get(col_name, {"count": 0, "db_keywords": []})
+                        match_count = match_info["count"]
+                        db_keywords = match_info["db_keywords"]
                         
-                        # Create headers for the results table
-                        header_col1, header_col2, header_col3 = st.columns([1, 4, 8])
-                        header_col1.write("**Rank**")
-                        header_col2.write("**Column Name**")
-                        header_col3.write("**Description Snippet**")
+                        # 4. Calculate the specific keywords that matched.
+                        matched_keywords = list(set(user_keywords) & set(db_keywords))
 
-                        # Display each result from the interleaved list
-                        for i, (col_name, col_desc) in enumerate(interleaved_results, 1):
-                            res_col1, res_col2, res_col3 = st.columns([1, 4, 8])
-                            res_col1.write(f"**{i}**")
-                            res_col2.write(col_name)
-                            res_col3.write(col_desc[:80] + "...") # Show first 80 chars
-                else:
-                    with results_container:
-                        st.error("No matching columns could be found for your query.")
+                        # 5. Create 5 columns for the data row.
+                        r_rank, r_col, r_desc, r_count, r_kwords = st.columns([1, 4, 8, 2, 3])
+                        r_rank.write(f"**{i}**")
+                        r_col.write(col_name)
+                        r_desc.write(col_desc[:80] + "...")
+                        r_count.write(f"**{match_count}**")
+                        # 6. Display the list of matched keywords as a comma-separated string.
+                        r_kwords.write(", ".join(matched_keywords))
+            else:
+                with results_container:
+                    st.error("No matching columns could be found for your query.")
                 
                 conn.close()
         else:
@@ -213,24 +278,4 @@ with col1:
 
 with col2:
     if st.button("Clear Results"):
-        # A placeholder button that doesn't need to do anything in Streamlit,
-        # as the app's state will naturally clear on the next search.
         st.info("Results will be cleared on the next search.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
