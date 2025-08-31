@@ -9,12 +9,7 @@ from dotenv import load_dotenv
 import inflect
 from urllib.parse import urlparse
 import nltk
-from nltk.corpus import wordnet
-from nltk.stem import WordNetLemmatizer
 from metadata_filter import *
-
-# Add this function near the top of your main app file
-import nltk
 import ssl
 
 def download_nltk_data():
@@ -30,13 +25,18 @@ def download_nltk_data():
     else:
         ssl._create_default_https_context = _create_unverified_https_context
 
-    # Check for and download 'wordnet'
+    # Check for and download 'wordnet' and 'omw-1.4'
     try:
+        # This will raise a LookupError if the resource is not found
         nltk.data.find('corpora/wordnet.zip')
-    except nltk.downloader.DownloadError:
-        print("Downloading NLTK 'wordnet' corpus...")
+        nltk.data.find('corpora/omw-1.4.zip')
+        print("NLTK corpora are already downloaded.")
+    except LookupError:
+        print("One or more NLTK corpora not found. Downloading...")
+        # If either is missing, download both for simplicity
         nltk.download('wordnet')
-        print("✅ 'wordnet' downloaded.")
+        nltk.download('omw-1.4')
+        print("✅ NLTK corpora downloaded.")
 
     # Check for and download 'omw-1.4'
     try:
@@ -47,6 +47,8 @@ def download_nltk_data():
         print("✅ 'omw-1.4' downloaded.")
 
 download_nltk_data()
+from nltk.corpus import wordnet
+from nltk.stem import WordNetLemmatizer
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
 # Initialize the OpenAI client
@@ -313,4 +315,5 @@ with col1:
 with col2:
     if st.button("Clear Results"):
         st.info("Results will be cleared on the next search.")
+
 
