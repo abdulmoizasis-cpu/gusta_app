@@ -13,6 +13,40 @@ from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 from metadata_filter import *
 
+# Add this function near the top of your main app file
+import nltk
+import ssl
+
+def download_nltk_data():
+    """
+    Downloads the 'wordnet' and 'omw-1.4' corpora for NLTK if they are not already present.
+    Includes a workaround for potential SSL certificate issues.
+    """
+    try:
+        # Create an unverified SSL context to handle potential certificate errors
+        _create_unverified_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass
+    else:
+        ssl._create_default_https_context = _create_unverified_https_context
+
+    # Check for and download 'wordnet'
+    try:
+        nltk.data.find('corpora/wordnet.zip')
+    except nltk.downloader.DownloadError:
+        print("Downloading NLTK 'wordnet' corpus...")
+        nltk.download('wordnet')
+        print("✅ 'wordnet' downloaded.")
+
+    # Check for and download 'omw-1.4'
+    try:
+        nltk.data.find('corpora/omw-1.4.zip')
+    except nltk.downloader.DownloadError:
+        print("Downloading NLTK 'omw-1.4' corpus...")
+        nltk.download('omw-1.4')
+        print("✅ 'omw-1.4' downloaded.")
+
+download_nltk_data()
 # --- Configuration and Backend Functions ---
 # This section contains all the necessary setup and logic from your existing files.
 # Initialize the OpenAI client
@@ -279,3 +313,4 @@ with col1:
 with col2:
     if st.button("Clear Results"):
         st.info("Results will be cleared on the next search.")
+
