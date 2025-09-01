@@ -1,12 +1,6 @@
-
 import streamlit as st
-import os
 import openai
 import psycopg2
-from collections import Counter
-import re
-from dotenv import load_dotenv
-import inflect
 from urllib.parse import urlparse
 import nltk
 from metadata_filter import *
@@ -18,27 +12,21 @@ def download_nltk_data():
     Includes a workaround for potential SSL certificate issues.
     """
     try:
-        # Create an unverified SSL context to handle potential certificate errors
         _create_unverified_https_context = ssl._create_unverified_context
     except AttributeError:
         pass
     else:
         ssl._create_default_https_context = _create_unverified_https_context
 
-    # Check for and download 'wordnet' and 'omw-1.4'
     try:
-        # This will raise a LookupError if the resource is not found
         nltk.data.find('corpora/wordnet.zip')
         nltk.data.find('corpora/omw-1.4.zip')
         print("NLTK corpora are already downloaded.")
     except LookupError:
         print("One or more NLTK corpora not found. Downloading...")
-        # If either is missing, download both for simplicity
         nltk.download('wordnet')
         nltk.download('omw-1.4')
         print("✅ NLTK corpora downloaded.")
-
-    # Check for and download 'omw-1.4'
     try:
         nltk.data.find('corpora/omw-1.4.zip')
     except nltk.downloader.DownloadError:
@@ -49,9 +37,6 @@ def download_nltk_data():
 download_nltk_data()
 from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
-# --- Configuration and Backend Functions ---
-# This section contains all the necessary setup and logic from your existing files.
-# Initialize the OpenAI client
 client = openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 DOMAIN_NAME = "Pharmaceutical"
@@ -100,13 +85,11 @@ ALL_COLUMNS = [
     "year_founded - IntegerField - 1991"
 ]
 
-# Using Streamlit's cache to speed up the app by avoiding repeated API calls for the same input
 @st.cache_data
 def reformulate_for_query(user_input: str) -> list[str]:
     """Generates technical descriptions from a user query using the OpenAI API."""
     formatted_all_columns = "\n".join([f'"{item}"' for item in ALL_COLUMNS])
     
-    # This is the template from your file, now inside the function
     reformulate_for_query_template = """
     Generate short, highly technical, domain-specific descriptions of the columns of a database table that most likely contain the information requested by the user using :
     1. user_input : A natural language user query
@@ -168,7 +151,7 @@ def get_embedding(text: str) -> list[float]:
     return response.data[0].embedding
 
 def vector_search(embedding: list[float], prefiltered_columns: list[str], conn) -> list:
-    """Performs a vector similarity search and returns the top 15 matches."""
+    """Performs a vector similarity search and returns the top 25 matches"""
     if not prefiltered_columns :
         with conn.cursor() as cursor:
             cursor.execute("""
@@ -183,7 +166,7 @@ def vector_search(embedding: list[float], prefiltered_columns: list[str], conn) 
             cursor.execute("""
                 SELECT column_name, description
                 FROM public.column_embeddings
-                WHERE column_name = ANY(%s) -- This is the new filtering clause
+                WHERE column_name = ANY(%s)
                 ORDER BY embedding <=> %s
                 LIMIT 25;
             """, (prefiltered_columns, str(embedding)))
@@ -218,18 +201,13 @@ def get_keyword_match_counts(user_keywords: list[str], conn) -> dict:
             results = cursor.fetchall()
             return results
     
-# --- The User Interface ---
 st.title("Database Vector Search")
 st.write("Enter a query to find the most relevant columns in the database.")
 
-# Create the pre-filled text for the prompt context
-# Display the context and provide a text area for the user input
 user_input = st.text_input("Enter your user_input here:")
 
-# Create a container to hold the results
 results_container = st.container()
 
-# Create columns for the Search and Clear buttons
 col1, col2 = st.columns(2)
 
 with col1:
@@ -239,10 +217,8 @@ with col1:
                 conn = psycopg2.connect(st.secrets["DB_URL"])
                 
             user_keywords = extract_unique_words_advanced([user_input])
-            # 2. Get the pre-filtered columns and their keyword match data
             keyword_matches_results = get_keyword_match_counts(user_keywords, conn)
 
-            # Create a dictionary for easy lookup of match counts and db_keywords
             keyword_match_data = {
                 column_name: {"count": match_count, "db_keywords": db_keywords}
                 for column_name, match_count, db_keywords in keyword_matches_results
@@ -250,7 +226,6 @@ with col1:
             
             prefiltered_columns = list(keyword_match_data.keys())
 
-            # 3. Generate technical descriptions for the vector search
             query_descriptions = reformulate_for_query(user_input)
             
             results_from_all_descriptions = []
@@ -260,7 +235,6 @@ with col1:
                     retrieved_columns = vector_search(embedding, prefiltered_columns, conn)
                     results_from_all_descriptions.append(retrieved_columns)
 
-            # 5. Aggregate and rank the vector search results using the interleaved method
             if results_from_all_descriptions:
                 interleaved_results = []
                 max_len = max(len(res) for res in results_from_all_descriptions if res)
@@ -278,31 +252,26 @@ with col1:
                 with results_container:
                     st.success("Search complete! Here are the most relevant columns found:")
                     
-                    # 1. Create 5 columns for the headers with adjusted widths.
                     h_rank, h_col, h_desc, h_count, h_kwords = st.columns([1, 4, 8, 2, 3])
                     h_rank.write("**Rank**")
                     h_col.write("**Column Name**")
                     h_desc.write("**Description Snippet**")
                     h_count.write("**Match Count**")
-                    h_kwords.write("**Keywords Matched**") # Use the correct variable for this header
+                    h_kwords.write("**Keywords Matched**")
 
-                    # 2. Loop through the ranked vector search results.
                     for i, (col_name, col_desc) in enumerate(interleaved_results, 1):
-                        # 3. Look up the keyword data for the current column.
                         match_info = keyword_match_data.get(col_name, {"count": 0, "db_keywords": []})
                         match_count = match_info["count"]
                         db_keywords = match_info["db_keywords"]
-                        
-                        # 4. Calculate the specific keywords that matched.
+
                         matched_keywords = list(set(user_keywords) & set(db_keywords))
 
-                        # 5. Create 5 columns for the data row.
                         r_rank, r_col, r_desc, r_count, r_kwords = st.columns([1, 4, 8, 2, 3])
                         r_rank.write(f"**{i}**")
                         r_col.write(col_name)
                         r_desc.write(col_desc[:80] + "...")
                         r_count.write(f"**{match_count}**")
-                        # 6. Display the list of matched keywords as a comma-separated string.
+
                         r_kwords.write(", ".join(matched_keywords))
             else:
                 with results_container:
@@ -315,6 +284,3 @@ with col1:
 with col2:
     if st.button("Clear Results"):
         st.info("Results will be cleared on the next search.")
-
-
-
