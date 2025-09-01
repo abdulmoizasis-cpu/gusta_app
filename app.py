@@ -175,7 +175,7 @@ def vector_search(embedding: list[float], prefiltered_columns: list[str], conn) 
                 SELECT column_name, description
                 FROM public.column_embeddings
                 ORDER BY embedding <=> %s
-                LIMIT 20;
+                LIMIT 25;
             """, (str(embedding),))
             return cursor.fetchall()
     else :
@@ -185,7 +185,7 @@ def vector_search(embedding: list[float], prefiltered_columns: list[str], conn) 
                 FROM public.column_embeddings
                 WHERE column_name = ANY(%s) -- This is the new filtering clause
                 ORDER BY embedding <=> %s
-                LIMIT 15;
+                LIMIT 25;
             """, (prefiltered_columns, str(embedding)))
             return cursor.fetchall()
 
@@ -315,5 +315,6 @@ with col1:
 with col2:
     if st.button("Clear Results"):
         st.info("Results will be cleared on the next search.")
+
 
 
