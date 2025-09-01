@@ -8,25 +8,11 @@ import nltk
 from nltk.corpus import wordnet
 from nltk.stem import WordNetLemmatizer
 
-
-# --- Configuration ---
-load_dotenv()
-
-DB_NAME = "embeddings_test"
-DB_USER = "postgres"
-DB_PASS = "ronaldo123." # Replace with your password
-DB_HOST = "127.0.0.1"
-DB_PORT = "5433"
-
 # --- Keyword Extraction Logic (from extract_keywords.py) ---
 # This section contains the functions to process text into a list of unique keywords.
-
-
-
 def extract_unique_words_advanced(data_list):
     """
-    Processes a list to extract unique words and domain names from URLs.
-    (This function remains unchanged)
+    Processes user query to generate a list of keywords to search the database for.
     """
     p = inflect.engine()
     unique_words_set = set()
@@ -71,8 +57,6 @@ def extract_unique_words_advanced(data_list):
 
     return list(unique_words_set)
 
-# print(extract_unique_words_advanced(["Which facilities produce up to 15000 L per fermenter?"]))
-# --- Main Test Logic ---
 
 def test_keyword_filter(user_queries: list[str]):
     """
@@ -144,5 +128,6 @@ if __name__ == "__main__":
     ]
     
     test_keyword_filter(queries_to_test)
+
 
 
